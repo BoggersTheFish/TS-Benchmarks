@@ -2,6 +2,8 @@
 
 `TS-Benchmarks` is the audit-first benchmark harness for the Thinking System ecosystem.
 
+This is not a victory-lap repo. It is a falsification harness. The first result shows clean relaxation on some graph families and failure on scale-free graphs, which is now the next target.
+
 The first implemented slice is Workstream A: scalable graph/tension tests for TS-Core-style relaxation. It creates deterministic synthetic graphs, injects contradictions, runs a sparse active-frontier relaxation loop, compares against simple baselines, and writes auditable receipts.
 
 ## Current Status
@@ -31,6 +33,18 @@ python3 -m ts_benchmarks.runners.scale_graph --nodes 1000 --graph scale_free --s
 python3 -m ts_benchmarks.runners.scale_sweep --sizes 100,1000,10000 --graphs random,scale_free,small_world --seed 42 --out-dir artifacts/scaling
 python3 -m ts_benchmarks.reports.plot_scaling --in-dir artifacts/scaling --out-dir artifacts/scaling/report
 ```
+
+Optional plot generation uses dev dependencies only:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python -m ts_benchmarks.reports.plot_scaling --in-dir artifacts/scaling --out-dir artifacts/scaling/report
+```
+
+## Issue #1
+
+Scale-free graphs retain high final tension under the reference relaxation config. See `docs/issues/001-scale-free-residual-tension.md`.
 
 ## Claim Boundary
 

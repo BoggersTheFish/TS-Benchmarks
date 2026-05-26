@@ -75,3 +75,7 @@ Forbidden after this slice:
 > TS scales to real knowledge graphs.
 > TS beats transformers.
 > TS solves hallucination.
+
+## Public Framing
+
+TS-Benchmarks is not a victory-lap repo. It is a falsification harness. The first result shows clean relaxation on some graph families and failure on scale-free graphs, which is now the next target.
