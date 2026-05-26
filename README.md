@@ -43,6 +43,26 @@ python3 -m ts_benchmarks.runners.scale_free_decomposition \
   --out-dir artifacts/decomposition
 ```
 
+v0.3 experimental hub-normalization ablation:
+
+```bash
+python3 -m ts_benchmarks.runners.hub_normalization_ablation \
+  --sizes 100,1000,10000 \
+  --graphs scale_free,random,small_world \
+  --seed 42 \
+  --out-dir artifacts/hub-normalization
+```
+
+v0.4 experimental topology-aware selector:
+
+```bash
+python3 -m ts_benchmarks.runners.topology_policy_selection \
+  --sizes 100,1000,10000 \
+  --graphs scale_free,random,small_world \
+  --seed 42 \
+  --out-dir artifacts/topology-policy
+```
+
 Optional plot generation uses dev dependencies only:
 
 ```bash
@@ -58,6 +78,27 @@ Scale-free graphs retain high final tension under the reference relaxation confi
 ## v0.2 Task
 
 `Scale-Free Failure Decomposition` asks whether the scale-free failure is caused by hub dominance, bad damping/plateau behavior, poor contradiction scoring, or active-frontier policy. It intentionally diagnoses the failure before changing the relaxation algorithm.
+
+## v0.3 Experimental Branch
+
+`Hub-Normalized Relaxation Ablation` tests three remedies against the reference config:
+
+- degree-normalized update
+- hub damping
+- residual redistribution
+
+The branch is experimental. A positive result means the remedy helped seeded synthetic graphs, not that TS-Core scales cleanly.
+
+## v0.4 Experimental Branch
+
+`Topology-Aware Relaxation Policy Selection` tests whether pre-run topology diagnostics can select a safer policy:
+
+- hub-heavy graphs select degree normalization
+- non-hub-heavy graphs keep the reference active-frontier policy
+
+The selector uses graph diagnostics only, not outcome metrics.
+
+This is not yet evidence of universal scaling; it is evidence that topology diagnostics can prevent a known policy tradeoff in the current synthetic sweep.
 
 ## Claim Boundary
 

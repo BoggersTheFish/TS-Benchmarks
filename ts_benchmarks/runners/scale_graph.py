@@ -17,6 +17,10 @@ from ts_benchmarks.tasks.scaling import RelaxationConfig, generate_graph, run_re
 
 
 def run_one(args: argparse.Namespace, out_path: Path) -> dict[str, object]:
+    update_policy = getattr(args, "update_policy", "reference")
+    hub_percentile = getattr(args, "hub_percentile", 0.95)
+    hub_damping_factor = getattr(args, "hub_damping_factor", 0.35)
+    nonhub_frontier_fraction = getattr(args, "nonhub_frontier_fraction", 0.30)
     graph = generate_graph(
         graph_type=args.graph,
         nodes=args.nodes,
@@ -31,6 +35,10 @@ def run_one(args: argparse.Namespace, out_path: Path) -> dict[str, object]:
         tolerance=args.tolerance,
         frontier=not args.no_frontier,
         provenance_weighting=not args.no_provenance_weighting,
+        update_policy=update_policy,
+        hub_percentile=hub_percentile,
+        hub_damping_factor=hub_damping_factor,
+        nonhub_frontier_fraction=nonhub_frontier_fraction,
     )
     result = run_relaxation(graph, config)
     baselines = {
@@ -55,6 +63,10 @@ def run_one(args: argparse.Namespace, out_path: Path) -> dict[str, object]:
         "tolerance": config.tolerance,
         "frontier": config.frontier,
         "provenance_weighting": config.provenance_weighting,
+        "update_policy": update_policy,
+        "hub_percentile": hub_percentile,
+        "hub_damping_factor": hub_damping_factor,
+        "nonhub_frontier_fraction": nonhub_frontier_fraction,
     }
     baseline_comparison = compare_systems(
         ts_metrics={
@@ -65,7 +77,7 @@ def run_one(args: argparse.Namespace, out_path: Path) -> dict[str, object]:
         baselines=baselines,
     )
     payload: dict[str, object] = {
-        "run_id": f"scale-{args.graph}-{args.nodes}-seed{args.seed}",
+        "run_id": run_id(args.graph, args.nodes, args.seed, update_policy),
         "graph": graph_payload,
         "config": config_payload,
         "metrics": result.metrics,
@@ -101,6 +113,12 @@ def run_one(args: argparse.Namespace, out_path: Path) -> dict[str, object]:
     payload["receipt_path"] = str(receipt_path)
     write_json(out_path, payload)
     return payload
+
+
+def run_id(graph: str, nodes: int, seed: int, update_policy: str) -> str:
+    if update_policy == "reference":
+        return f"scale-{graph}-{nodes}-seed{seed}"
+    return f"scale-{graph}-{nodes}-{update_policy}-seed{seed}"
 
 
 def compare_systems(
@@ -169,6 +187,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tolerance", type=float, default=1e-4)
     parser.add_argument("--no-frontier", action="store_true")
     parser.add_argument("--no-provenance-weighting", action="store_true")
+    parser.add_argument(
+        "--update-policy",
+        default="reference",
+        choices=["reference", "degree_normalized", "hub_damping", "residual_redistribution"],
+    )
+    parser.add_argument("--hub-percentile", type=float, default=0.95)
+    parser.add_argument("--hub-damping-factor", type=float, default=0.35)
+    parser.add_argument("--nonhub-frontier-fraction", type=float, default=0.30)
     parser.add_argument("--out", required=True)
     parser.add_argument("--receipt")
     return parser

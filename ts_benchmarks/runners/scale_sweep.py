@@ -30,6 +30,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tolerance", type=float, default=1e-4)
     parser.add_argument("--no-frontier", action="store_true")
     parser.add_argument("--no-provenance-weighting", action="store_true")
+    parser.add_argument(
+        "--update-policy",
+        default="reference",
+        choices=["reference", "degree_normalized", "hub_damping", "residual_redistribution"],
+    )
+    parser.add_argument("--hub-percentile", type=float, default=0.95)
+    parser.add_argument("--hub-damping-factor", type=float, default=0.35)
+    parser.add_argument("--nonhub-frontier-fraction", type=float, default=0.30)
     parser.add_argument("--out-dir", required=True)
     return parser
 
@@ -66,6 +74,14 @@ def main(argv: list[str] | None = None) -> int:
                     str(args.tolerance),
                     "--out",
                     str(out_path),
+                    "--update-policy",
+                    args.update_policy,
+                    "--hub-percentile",
+                    str(args.hub_percentile),
+                    "--hub-damping-factor",
+                    str(args.hub_damping_factor),
+                    "--nonhub-frontier-fraction",
+                    str(args.nonhub_frontier_fraction),
                 ]
                 + (["--no-frontier"] if args.no_frontier else [])
                 + (["--no-provenance-weighting"] if args.no_provenance_weighting else [])
