@@ -13,6 +13,6 @@ What exists now:
 
 Important limitation:
 
-This is not a transformer-killer result. It is a scaling harness. The first sweep already exposed a failure mode: the initial reference relaxation handled random and small-world graphs much better than scale-free graphs, where final tension stayed high and contradiction localization failed under the first config.
+TS-Benchmarks is not a victory-lap repo. It is a falsification harness. The first sweep already exposed a failure mode: the initial reference relaxation handled random and small-world graphs much better than scale-free graphs, where final tension stayed high and contradiction localization failed under the first config.
 
 That is exactly the point of the next phase: turn TS claims into measurements, including failures.

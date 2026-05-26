@@ -34,6 +34,11 @@ def write_csv(runs: list[dict[str, Any]], out_path: Path) -> None:
         "initial_global_tension",
         "final_global_tension",
         "contradiction_localization_f1",
+        "degree_baseline_f1",
+        "pagerank_like_baseline_f1",
+        "random_residual_baseline_f1",
+        "plateau_step",
+        "hub_residual_tension_share",
         "edges_relaxed_per_s",
     ]
     with out_path.open("w", newline="", encoding="utf-8") as handle:
@@ -45,6 +50,9 @@ def write_csv(runs: list[dict[str, Any]], out_path: Path) -> None:
                 "graph_type": run["graph"]["type"],
                 "nodes": run["graph"]["nodes"],
                 "edges": run["graph"]["edges"],
+                "degree_baseline_f1": run["baselines"]["degree"]["f1"],
+                "pagerank_like_baseline_f1": run["baselines"]["pagerank_like"]["f1"],
+                "random_residual_baseline_f1": run["baselines"]["random_residual"]["f1"],
             }
             row.update({field: run["metrics"].get(field) for field in fields if field not in row})
             writer.writerow(row)
@@ -52,10 +60,44 @@ def write_csv(runs: list[dict[str, Any]], out_path: Path) -> None:
 
 def write_markdown(runs: list[dict[str, Any]], out_path: Path) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    failed_scale_free = [
+        run
+        for run in runs
+        if run["graph"]["type"] == "scale_free"
+        and (
+            float(run["metrics"]["final_global_tension"]) > 0.05
+            or float(run["metrics"]["contradiction_localization_f1"]) == 0.0
+        )
+    ]
     lines = [
         "# TS-Core Scaling Report",
         "",
-        "This report is generated from local benchmark receipts. It is not a capability claim.",
+        "TS-Benchmarks is not a victory-lap repo. It is a falsification harness. The first result shows clean relaxation on some graph families and failure on scale-free graphs, which is now the next target.",
+        "",
+        "This report is generated from local benchmark receipts. It is not a capability claim and not a transformer comparison.",
+        "",
+        "## What Worked",
+        "",
+        *worked_lines(runs),
+        "",
+        "## What Failed",
+        "",
+        *failed_lines(runs),
+        "",
+        "## What This Means",
+        "",
+        "- The reference relaxation path can reduce injected tension on some sparse synthetic graph families.",
+        "- The same reference config is not yet robust to scale-free hub structure.",
+        "- Scale-free failure is a useful target because real knowledge graphs often have hub-heavy structure.",
+        "- These results justify diagnostics and kernel work; they do not justify broad capability claims.",
+        "",
+        "## Next Experiment",
+        "",
+        "- Add hub-aware relaxation controls: degree-normalized updates, hub clipping, and per-context hub splitting.",
+        "- Re-run the same 100/1k/10k scale-free sweep before changing the claim boundary.",
+        "- Add NetworkX, belief-propagation, and Bayesian provenance baselines.",
+        "",
+        "## Summary Metrics",
         "",
         "| Run | Graph | Nodes | Edges | Runtime s | Peak MB | Final tension | F1 |",
         "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
@@ -74,7 +116,115 @@ def write_markdown(runs: list[dict[str, Any]], out_path: Path) -> None:
                 f1=float(metrics["contradiction_localization_f1"]),
             )
         )
+    lines.extend(
+        [
+            "",
+            "## Baseline Comparison",
+            "",
+            "| Run | TS F1 | Degree F1 | PageRank-like F1 | Random residual F1 | TS vs best baseline |",
+            "| --- | ---: | ---: | ---: | ---: | --- |",
+        ]
+    )
+    for run in runs:
+        ts_f1 = float(run["metrics"]["contradiction_localization_f1"])
+        baseline_f1s = {
+            "degree": float(run["baselines"]["degree"]["f1"]),
+            "pagerank_like": float(run["baselines"]["pagerank_like"]["f1"]),
+            "random_residual": float(run["baselines"]["random_residual"]["f1"]),
+        }
+        best_name, best_f1 = max(baseline_f1s.items(), key=lambda item: item[1])
+        if abs(ts_f1 - best_f1) < 1e-9:
+            verdict = f"equivalent to {best_name}"
+        elif ts_f1 > best_f1:
+            verdict = f"wins by {ts_f1 - best_f1:.3f}"
+        else:
+            verdict = f"loses to {best_name} by {best_f1 - ts_f1:.3f}"
+        lines.append(
+            "| {run_id} | {ts:.3f} | {degree:.3f} | {pagerank:.3f} | {random_f1:.3f} | {verdict} |".format(
+                run_id=run["run_id"],
+                ts=ts_f1,
+                degree=baseline_f1s["degree"],
+                pagerank=baseline_f1s["pagerank_like"],
+                random_f1=baseline_f1s["random_residual"],
+                verdict=verdict,
+            )
+        )
+    if failed_scale_free:
+        lines.extend(["", "## Scale-Free Failure Diagnostics", ""])
+        for run in failed_scale_free:
+            diagnostics = run["diagnostics"]
+            hub = diagnostics["hub_dominance"]
+            confusion = diagnostics["contradiction_localization_confusion_matrix"]
+            lines.extend(
+                [
+                    f"### {run['run_id']}",
+                    "",
+                    f"- Plateau step: {diagnostics['plateau_step']}",
+                    f"- Hub residual tension share: {float(hub['hub_residual_tension_share']):.3f} at degree threshold {hub['hub_degree_threshold']}",
+                    f"- Confusion matrix: TP={confusion['tp']} FP={confusion['fp']} FN={confusion['fn']} TN={confusion['tn']}",
+                    f"- Active frontier first/last: {diagnostics['active_frontier_history'][:5]} -> {diagnostics['active_frontier_history'][-5:]}",
+                    "",
+                    "| Degree bucket | Nodes | Total tension | Avg tension | Max tension |",
+                    "| --- | ---: | ---: | ---: | ---: |",
+                ]
+            )
+            for bucket in diagnostics["tension_by_degree_bucket"]:
+                lines.append(
+                    "| {bucket} | {nodes} | {total:.6f} | {avg:.6f} | {max_tension:.6f} |".format(
+                        bucket=bucket["bucket"],
+                        nodes=bucket["nodes"],
+                        total=float(bucket["total_tension"]),
+                        avg=float(bucket["avg_tension"]),
+                        max_tension=float(bucket["max_tension"]),
+                    )
+                )
+            lines.extend(
+                [
+                    "",
+                    "| Edge | Relation | Tension | Src degree | Dst degree | Provenance |",
+                    "| ---: | --- | ---: | ---: | ---: | --- |",
+                ]
+            )
+            for edge in diagnostics["top_residual_edges"][:10]:
+                lines.append(
+                    "| {idx} | {relation} | {tension:.6f} | {src_degree} | {dst_degree} | {provenance} |".format(
+                        idx=edge["edge_index"],
+                        relation=edge["relation"],
+                        tension=float(edge["tension"]),
+                        src_degree=edge["src_degree"],
+                        dst_degree=edge["dst_degree"],
+                        provenance=edge["provenance"],
+                    )
+                )
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def worked_lines(runs: list[dict[str, Any]]) -> list[str]:
+    lines: list[str] = []
+    for graph_type in sorted({run["graph"]["type"] for run in runs}):
+        graph_runs = [run for run in runs if run["graph"]["type"] == graph_type]
+        clean = [
+            run
+            for run in graph_runs
+            if float(run["metrics"]["final_global_tension"]) < 0.01
+            and float(run["metrics"]["contradiction_localization_f1"]) > 0.0
+        ]
+        if clean:
+            max_nodes = max(run["graph"]["nodes"] for run in clean)
+            lines.append(f"- `{graph_type}`: relaxed cleanly with nonzero localization up to {max_nodes} nodes.")
+    return lines or ["- No graph family met the first-pass clean-relaxation threshold."]
+
+
+def failed_lines(runs: list[dict[str, Any]]) -> list[str]:
+    lines: list[str] = []
+    for run in runs:
+        final_tension = float(run["metrics"]["final_global_tension"])
+        f1 = float(run["metrics"]["contradiction_localization_f1"])
+        if final_tension > 0.05 or f1 == 0.0:
+            lines.append(
+                f"- `{run['run_id']}`: final tension {final_tension:.6f}, contradiction-localization F1 {f1:.3f}."
+            )
+    return lines or ["- No run crossed the first-pass failure threshold."]
 
 
 def write_optional_plots(runs: list[dict[str, Any]], out_dir: Path) -> list[Path]:

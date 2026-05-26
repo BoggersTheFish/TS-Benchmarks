@@ -7,17 +7,22 @@
     "receipt_id",
     "timestamp_utc",
     "repo",
+    "repo_url",
     "branch",
     "commit",
+    "commit_sha",
+    "dirty_tree",
     "machine",
     "dependencies",
     "dataset",
     "system",
     "model",
     "seed",
+    "graph_family",
     "config",
     "command",
     "metrics",
+    "known_caveats",
     "failure_cases",
     "logs_path",
     "artifacts"
@@ -26,8 +31,20 @@
     "receipt_id": {"type": "string"},
     "timestamp_utc": {"type": "string"},
     "repo": {"type": "string"},
+    "repo_url": {"type": ["string", "null"]},
     "branch": {"type": "string"},
     "commit": {"type": "string"},
+    "commit_sha": {"type": "string"},
+    "dirty_tree": {
+      "type": "object",
+      "required": ["available", "is_dirty", "status", "files"],
+      "properties": {
+        "available": {"type": "boolean"},
+        "is_dirty": {"type": ["boolean", "null"]},
+        "status": {"type": "string"},
+        "files": {"type": "array", "items": {"type": "string"}}
+      }
+    },
     "machine": {
       "type": "object",
       "required": ["hostname_hash", "cpu", "platform", "python_version"],
@@ -68,9 +85,11 @@
       }
     },
     "seed": {"type": "integer"},
+    "graph_family": {"type": "string"},
     "config": {"type": "object"},
     "command": {"type": "string"},
     "metrics": {"type": "object"},
+    "known_caveats": {"type": "array", "items": {"type": "string"}},
     "failure_cases": {"type": "array"},
     "logs_path": {"type": "string"},
     "artifacts": {

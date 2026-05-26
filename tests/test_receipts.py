@@ -33,6 +33,12 @@ class ReceiptTests(unittest.TestCase):
             result = json.loads(out.read_text(encoding="utf-8"))
             receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
             self.assertEqual(result["run_id"], receipt["receipt_id"])
+            self.assertIn("repo_url", receipt)
+            self.assertIn("commit_sha", receipt)
+            self.assertIn("dirty_tree", receipt)
+            self.assertEqual(receipt["graph_family"], "random")
+            self.assertTrue(receipt["known_caveats"])
+            self.assertIn("baseline_comparison", receipt["metrics"])
             self.assertTrue(receipt["dataset"]["hash"])
             self.assertTrue(receipt["artifacts"][0]["sha256"])
 

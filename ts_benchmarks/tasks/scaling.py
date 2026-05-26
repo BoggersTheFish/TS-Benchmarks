@@ -65,7 +65,9 @@ class RelaxationConfig:
 class RelaxationResult:
     metrics: dict[str, float | int | bool]
     tension_history: list[float]
+    active_frontier_history: list[int]
     top_tension_nodes: list[dict[str, float | int]]
+    diagnostics: dict[str, object]
     final_values: list[float]
 
 
@@ -138,6 +140,7 @@ def run_relaxation(graph: SyntheticGraph, config: RelaxationConfig) -> Relaxatio
     values = list(graph.values)
     active_nodes = set(range(graph.spec.nodes))
     tension_history: list[float] = []
+    active_frontier_history: list[int] = []
     peak_node_tension = [0.0 for _ in values]
     oscillation_detected = False
 
@@ -147,6 +150,7 @@ def run_relaxation(graph: SyntheticGraph, config: RelaxationConfig) -> Relaxatio
     converged = False
 
     for _step in range(config.steps):
+        active_frontier_history.append(len(active_nodes))
         active_edges = _active_edges(graph, active_nodes) if config.frontier else range(len(graph.edges))
         deltas: dict[int, float] = {}
         relaxed_this_step = 0
@@ -206,6 +210,15 @@ def run_relaxation(graph: SyntheticGraph, config: RelaxationConfig) -> Relaxatio
         reverse=True,
     )[: min(25, graph.spec.nodes)]
     localization = contradiction_localization(peak_node_tension, graph.spec.contradiction_pairs)
+    diagnostics = graph_diagnostics(
+        graph=graph,
+        values=values,
+        node_tension=final_node_tension,
+        peak_node_tension=peak_node_tension,
+        tension_history=tension_history,
+        active_frontier_history=active_frontier_history,
+        config=config,
+    )
     initial_tension = tension_history[0] if tension_history else final_tension
 
     metrics: dict[str, float | int | bool] = {
@@ -222,11 +235,15 @@ def run_relaxation(graph: SyntheticGraph, config: RelaxationConfig) -> Relaxatio
         "contradiction_localization_f1": localization["f1"],
         "edges_relaxed": edges_relaxed,
         "edges_relaxed_per_s": edges_relaxed / runtime_s if runtime_s > 0 else 0.0,
+        "plateau_step": diagnostics["plateau_step"],
+        "hub_residual_tension_share": diagnostics["hub_dominance"]["hub_residual_tension_share"],
     }
     return RelaxationResult(
         metrics=metrics,
         tension_history=tension_history,
+        active_frontier_history=active_frontier_history,
         top_tension_nodes=top_nodes,
+        diagnostics=diagnostics,
         final_values=values,
     )
 
@@ -271,6 +288,156 @@ def contradiction_localization(
     recall = true_positive / max(1, len(truth))
     f1 = 2 * precision * recall / max(1e-12, precision + recall)
     return {"precision": precision, "recall": recall, "f1": f1}
+
+
+def contradiction_confusion_matrix(
+    node_scores: list[float],
+    contradiction_pairs: list[tuple[int, int]],
+) -> dict[str, int]:
+    truth = {node for pair in contradiction_pairs for node in pair}
+    if not truth:
+        return {"tp": 0, "fp": 0, "fn": 0, "tn": len(node_scores)}
+    k = len(truth)
+    predicted = {
+        idx
+        for idx, _score in sorted(enumerate(node_scores), key=lambda row: row[1], reverse=True)[:k]
+    }
+    all_nodes = set(range(len(node_scores)))
+    return {
+        "tp": len(predicted & truth),
+        "fp": len(predicted - truth),
+        "fn": len(truth - predicted),
+        "tn": len(all_nodes - truth - predicted),
+    }
+
+
+def graph_diagnostics(
+    *,
+    graph: SyntheticGraph,
+    values: list[float],
+    node_tension: list[float],
+    peak_node_tension: list[float],
+    tension_history: list[float],
+    active_frontier_history: list[int],
+    config: RelaxationConfig,
+) -> dict[str, object]:
+    degrees = node_degrees(graph)
+    residual_edges = residual_edge_tensions(graph, values, config)
+    total_residual = sum(float(edge["tension"]) for edge in residual_edges)
+    hub_threshold = degree_percentile(degrees, 0.95)
+    hub_residual = sum(
+        float(edge["tension"])
+        for edge in residual_edges
+        if int(edge["src_degree"]) >= hub_threshold or int(edge["dst_degree"]) >= hub_threshold
+    )
+    return {
+        "tension_by_degree_bucket": tension_by_degree_bucket(degrees, node_tension),
+        "top_residual_edges": residual_edges[:25],
+        "hub_dominance": {
+            "hub_degree_threshold": hub_threshold,
+            "hub_residual_tension": hub_residual,
+            "total_residual_tension": total_residual,
+            "hub_residual_tension_share": hub_residual / total_residual if total_residual else 0.0,
+        },
+        "plateau_step": steps_until_plateau(tension_history),
+        "active_frontier_history": active_frontier_history,
+        "contradiction_localization_confusion_matrix": contradiction_confusion_matrix(
+            peak_node_tension,
+            graph.spec.contradiction_pairs,
+        ),
+    }
+
+
+def node_degrees(graph: SyntheticGraph) -> list[int]:
+    degrees = [0 for _ in range(graph.spec.nodes)]
+    for edge in graph.edges:
+        degrees[edge.src] += 1
+        degrees[edge.dst] += 1
+    return degrees
+
+
+def residual_edge_tensions(
+    graph: SyntheticGraph,
+    values: list[float],
+    config: RelaxationConfig,
+) -> list[dict[str, float | int | str]]:
+    degrees = node_degrees(graph)
+    rows: list[dict[str, float | int | str]] = []
+    for idx, edge in enumerate(graph.edges):
+        tension = edge_tension(edge, values, config)
+        rows.append(
+            {
+                "edge_index": idx,
+                "src": edge.src,
+                "dst": edge.dst,
+                "relation": edge.relation,
+                "weight": edge.weight,
+                "tension": tension,
+                "src_degree": degrees[edge.src],
+                "dst_degree": degrees[edge.dst],
+                "context": edge.context,
+                "provenance": edge.provenance,
+            }
+        )
+    return sorted(rows, key=lambda row: float(row["tension"]), reverse=True)
+
+
+def edge_tension(edge: Edge, values: list[float], config: RelaxationConfig | None = None) -> float:
+    weight = _effective_weight(edge, config) if config else edge.weight
+    src_value = values[edge.src]
+    dst_value = values[edge.dst]
+    if edge.relation == CONTRADICTS:
+        return weight * abs(src_value + dst_value)
+    return weight * abs(src_value - dst_value)
+
+
+def tension_by_degree_bucket(degrees: list[int], node_tension: list[float]) -> list[dict[str, float | int | str]]:
+    buckets: list[tuple[str, int, int | None]] = [
+        ("0", 0, 0),
+        ("1-2", 1, 2),
+        ("3-5", 3, 5),
+        ("6-10", 6, 10),
+        ("11-25", 11, 25),
+        ("26-50", 26, 50),
+        ("51+", 51, None),
+    ]
+    rows: list[dict[str, float | int | str]] = []
+    for label, lower, upper in buckets:
+        indexes = [
+            idx
+            for idx, degree in enumerate(degrees)
+            if degree >= lower and (upper is None or degree <= upper)
+        ]
+        total = sum(node_tension[idx] for idx in indexes)
+        rows.append(
+            {
+                "bucket": label,
+                "nodes": len(indexes),
+                "total_tension": total,
+                "avg_tension": total / len(indexes) if indexes else 0.0,
+                "max_tension": max((node_tension[idx] for idx in indexes), default=0.0),
+            }
+        )
+    return rows
+
+
+def degree_percentile(degrees: list[int], percentile: float) -> int:
+    if not degrees:
+        return 0
+    ordered = sorted(degrees)
+    idx = min(len(ordered) - 1, max(0, int((len(ordered) - 1) * percentile)))
+    return ordered[idx]
+
+
+def steps_until_plateau(history: list[float], tolerance: float = 1e-4, window: int = 5) -> int:
+    if len(history) < window + 1:
+        return len(history)
+    for idx in range(window, len(history)):
+        recent = history[idx - window : idx + 1]
+        deltas = [abs(recent[pos] - recent[pos - 1]) for pos in range(1, len(recent))]
+        if max(deltas) <= tolerance:
+            return idx - window + 1
+    return len(history)
 
 
 def _active_edges(graph: SyntheticGraph, active_nodes: set[int]) -> list[int]:

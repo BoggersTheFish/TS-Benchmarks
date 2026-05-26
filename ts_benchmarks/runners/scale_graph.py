@@ -7,7 +7,11 @@ import json
 from pathlib import Path
 import sys
 
-from ts_benchmarks.baselines.graph_baselines import degree_baseline, pagerank_like_baseline
+from ts_benchmarks.baselines.graph_baselines import (
+    degree_baseline,
+    pagerank_like_baseline,
+    random_residual_baseline,
+)
 from ts_benchmarks.receipts import build_receipt, stable_hash, write_json
 from ts_benchmarks.tasks.scaling import RelaxationConfig, generate_graph, run_relaxation
 
@@ -32,6 +36,7 @@ def run_one(args: argparse.Namespace, out_path: Path) -> dict[str, object]:
     baselines = {
         "degree": degree_baseline(graph),
         "pagerank_like": pagerank_like_baseline(graph),
+        "random_residual": random_residual_baseline(graph),
     }
     graph_payload = {
         "type": graph.spec.graph_type,
@@ -51,14 +56,25 @@ def run_one(args: argparse.Namespace, out_path: Path) -> dict[str, object]:
         "frontier": config.frontier,
         "provenance_weighting": config.provenance_weighting,
     }
+    baseline_comparison = compare_systems(
+        ts_metrics={
+            "precision": result.metrics["contradiction_localization_precision"],
+            "recall": result.metrics["contradiction_localization_recall"],
+            "f1": result.metrics["contradiction_localization_f1"],
+        },
+        baselines=baselines,
+    )
     payload: dict[str, object] = {
         "run_id": f"scale-{args.graph}-{args.nodes}-seed{args.seed}",
         "graph": graph_payload,
         "config": config_payload,
         "metrics": result.metrics,
         "baselines": baselines,
+        "baseline_comparison": baseline_comparison,
         "tension_history": result.tension_history,
+        "active_frontier_history": result.active_frontier_history,
         "top_tension_nodes": result.top_tension_nodes,
+        "diagnostics": result.diagnostics,
     }
     write_json(out_path, payload)
 
@@ -75,7 +91,9 @@ def run_one(args: argparse.Namespace, out_path: Path) -> dict[str, object]:
         dataset=dataset,
         system={"name": "ts-core-reference-relaxation", "variant": "sparse-frontier"},
         config=config_payload,
-        metrics=result.metrics,
+        metrics={**result.metrics, "baselines": baselines, "baseline_comparison": baseline_comparison},
+        graph_family=args.graph,
+        known_caveats=known_caveats(args.graph, result.metrics),
         artifacts=[out_path],
     )
     receipt_path = Path(args.receipt) if args.receipt else out_path.with_suffix(".receipt.json")
@@ -83,6 +101,55 @@ def run_one(args: argparse.Namespace, out_path: Path) -> dict[str, object]:
     payload["receipt_path"] = str(receipt_path)
     write_json(out_path, payload)
     return payload
+
+
+def compare_systems(
+    *,
+    ts_metrics: dict[str, float | int | bool],
+    baselines: dict[str, dict[str, float]],
+) -> dict[str, object]:
+    ts_f1 = float(ts_metrics["f1"])
+    systems: dict[str, dict[str, object]] = {
+        "ts_active_frontier_relaxation": {
+            "precision": float(ts_metrics["precision"]),
+            "recall": float(ts_metrics["recall"]),
+            "f1": ts_f1,
+            "role": "candidate",
+        }
+    }
+    deltas: dict[str, dict[str, object]] = {}
+    for name, metrics in baselines.items():
+        baseline_f1 = float(metrics["f1"])
+        delta = ts_f1 - baseline_f1
+        if abs(delta) < 1e-9:
+            verdict = "equivalent"
+        elif delta > 0:
+            verdict = "ts_wins"
+        else:
+            verdict = "ts_loses"
+        systems[name] = {
+            "precision": float(metrics["precision"]),
+            "recall": float(metrics["recall"]),
+            "f1": baseline_f1,
+            "role": "baseline",
+        }
+        deltas[name] = {"f1_delta": delta, "verdict": verdict}
+    return {"systems": systems, "ts_vs_baselines": deltas}
+
+
+def known_caveats(graph_family: str, metrics: dict[str, object]) -> list[str]:
+    caveats = [
+        "Synthetic graph benchmark only; this is not a real-world knowledge graph result.",
+        "Reference implementation is dependency-light Python, not the final sparse/GPU runtime.",
+        "Contradiction localization is measured against injected synthetic contradictions.",
+    ]
+    final_tension = float(metrics["final_global_tension"])
+    f1 = float(metrics["contradiction_localization_f1"])
+    if graph_family == "scale_free" and (final_tension > 0.05 or f1 == 0.0):
+        caveats.append(
+            "Scale-free graph failed this reference config: residual tension stayed high or localization failed."
+        )
+    return caveats
 
 
 def build_parser() -> argparse.ArgumentParser:

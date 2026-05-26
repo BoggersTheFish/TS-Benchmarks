@@ -1,6 +1,10 @@
 import unittest
 
-from ts_benchmarks.baselines.graph_baselines import degree_baseline, pagerank_like_baseline
+from ts_benchmarks.baselines.graph_baselines import (
+    degree_baseline,
+    pagerank_like_baseline,
+    random_residual_baseline,
+)
 from ts_benchmarks.tasks.scaling import RelaxationConfig, generate_graph, run_relaxation
 
 
@@ -24,7 +28,7 @@ class ScalingTests(unittest.TestCase):
 
     def test_baselines_emit_localization_metrics(self):
         graph = generate_graph("random", nodes=100, seed=9)
-        for baseline in [degree_baseline, pagerank_like_baseline]:
+        for baseline in [degree_baseline, pagerank_like_baseline, random_residual_baseline]:
             metrics = baseline(graph)
             self.assertEqual(set(metrics), {"precision", "recall", "f1"})
             self.assertGreaterEqual(metrics["f1"], 0.0)

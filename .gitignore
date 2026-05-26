@@ -7,5 +7,9 @@ __pycache__/
 build/
 dist/
 *.egg-info/
-artifacts/
+artifacts/*
 !artifacts/.gitkeep
+!artifacts/scaling/
+artifacts/scaling/*
+!artifacts/scaling/report/
+!artifacts/scaling/report/**

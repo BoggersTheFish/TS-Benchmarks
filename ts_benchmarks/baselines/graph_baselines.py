@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import random
+
 from ts_benchmarks.tasks.scaling import CONTRADICTS, SyntheticGraph, contradiction_localization
 
 
@@ -38,4 +40,12 @@ def pagerank_like_baseline(graph: SyntheticGraph, steps: int = 32, damping: floa
                 next_scores[dst] += share
         scores = [score + 0.05 * contradiction_boost[idx] for idx, score in enumerate(next_scores)]
 
+    return contradiction_localization(scores, graph.spec.contradiction_pairs)
+
+
+def random_residual_baseline(graph: SyntheticGraph) -> dict[str, float]:
+    """Deterministic random localization floor."""
+
+    rng = random.Random(graph.spec.seed + 1009)
+    scores = [rng.random() for _ in range(graph.spec.nodes)]
     return contradiction_localization(scores, graph.spec.contradiction_pairs)

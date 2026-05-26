@@ -4,6 +4,7 @@ This is the local issue board seed. Convert these into GitHub issues when the re
 
 ## Workstream A: Scaling TS-Core
 
+- [ ] Issue #1: Scale-free graphs retain high final tension under reference relaxation config.
 - [x] Create benchmark package skeleton.
 - [x] Add deterministic graph generators.
 - [x] Add sparse active-frontier reference relaxation.
