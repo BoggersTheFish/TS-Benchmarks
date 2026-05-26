@@ -63,6 +63,18 @@ python3 -m ts_benchmarks.runners.topology_policy_selection \
   --out-dir artifacts/topology-policy
 ```
 
+v0.5 experimental adversarial topology generalization:
+
+```bash
+python3 -m ts_benchmarks.runners.adversarial_topology_generalization \
+  --sizes 100,1000 \
+  --families mixed_core_periphery,hub_threshold_sweep,topology_noise_sweep \
+  --placements hub_hub,hub_leaf,leaf_leaf,random \
+  --hub-strengths 0.25,0.35,0.45,0.60,0.75 \
+  --seed 42 \
+  --out-dir artifacts/adversarial-topology
+```
+
 Optional plot generation uses dev dependencies only:
 
 ```bash
@@ -99,6 +111,10 @@ The branch is experimental. A positive result means the remedy helped seeded syn
 The selector uses graph diagnostics only, not outcome metrics.
 
 This is not yet evidence of universal scaling; it is evidence that topology diagnostics can prevent a known policy tradeoff in the current synthetic sweep.
+
+## v0.5 Experimental Branch
+
+`Adversarial Topology Generalization` tries to falsify the v0.4 selector with mixed, near-boundary, noisy, and contradiction-placement-stressed graphs. The selector still uses pre-run topology diagnostics only. The oracle-best policy is computed after outcomes only for audit/regret reporting.
 
 ## Claim Boundary
 

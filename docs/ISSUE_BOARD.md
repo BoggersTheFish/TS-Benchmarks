@@ -22,6 +22,8 @@ This is the local issue board seed. Convert these into GitHub issues when the re
 - [ ] Run v0.3 ablation receipt from clean experimental branch and attach result to Issue #2.
 - [x] Open Issue #4 for v0.4 topology-aware policy selection.
 - [x] Run v0.4 selector receipt from clean experimental branch and attach result to Issue #4.
+- [x] Open Issue #6 for v0.5 adversarial topology generalization.
+- [ ] Run v0.5 adversarial receipt from clean experimental branch and attach result to Issue #6.
 
 ## Workstream B: Hard Reasoning Benchmarks
 
