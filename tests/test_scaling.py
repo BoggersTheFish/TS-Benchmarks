@@ -6,6 +6,7 @@ from ts_benchmarks.baselines.graph_baselines import (
     random_residual_baseline,
 )
 from ts_benchmarks.tasks.scaling import RelaxationConfig, generate_graph, run_relaxation
+from ts_benchmarks.tasks.failure_decomposition import decompose_scale_free_failure
 
 
 class ScalingTests(unittest.TestCase):
@@ -33,6 +34,26 @@ class ScalingTests(unittest.TestCase):
             self.assertEqual(set(metrics), {"precision", "recall", "f1"})
             self.assertGreaterEqual(metrics["f1"], 0.0)
             self.assertLessEqual(metrics["f1"], 1.0)
+
+    def test_scale_free_failure_decomposition_metrics(self):
+        graph = generate_graph("scale_free", nodes=100, seed=42)
+        config = RelaxationConfig(steps=8)
+        result = run_relaxation(graph, config)
+        decomposition = decompose_scale_free_failure(graph, result, config)
+        metrics = decomposition["metrics"]
+        for key in [
+            "hub_residual_share",
+            "nonhub_residual_share",
+            "hub_to_nonhub_residual_ratio",
+            "mean_residual_by_degree_decile",
+            "max_residual_edge_degree_product",
+            "frontier_churn_rate",
+            "plateau_residual_slope",
+            "contradiction_rank_of_planted_edge",
+        ]:
+            self.assertIn(key, metrics)
+        self.assertEqual(decomposition["task"], "Scale-Free Failure Decomposition")
+        self.assertIn("primary", decomposition["diagnosis"])
 
 
 if __name__ == "__main__":

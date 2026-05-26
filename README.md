@@ -34,6 +34,15 @@ python3 -m ts_benchmarks.runners.scale_sweep --sizes 100,1000,10000 --graphs ran
 python3 -m ts_benchmarks.reports.plot_scaling --in-dir artifacts/scaling --out-dir artifacts/scaling/report
 ```
 
+v0.2 failure decomposition:
+
+```bash
+python3 -m ts_benchmarks.runners.scale_free_decomposition \
+  --sizes 100,1000,10000 \
+  --seed 42 \
+  --out-dir artifacts/decomposition
+```
+
 Optional plot generation uses dev dependencies only:
 
 ```bash
@@ -45,6 +54,10 @@ python3 -m venv .venv
 ## Issue #1
 
 Scale-free graphs retain high final tension under the reference relaxation config. See `docs/issues/001-scale-free-residual-tension.md`.
+
+## v0.2 Task
+
+`Scale-Free Failure Decomposition` asks whether the scale-free failure is caused by hub dominance, bad damping/plateau behavior, poor contradiction scoring, or active-frontier policy. It intentionally diagnoses the failure before changing the relaxation algorithm.
 
 ## Claim Boundary
 

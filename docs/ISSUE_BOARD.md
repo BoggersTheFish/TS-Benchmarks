@@ -16,6 +16,8 @@ This is the local issue board seed. Convert these into GitHub issues when the re
 - [ ] Add noise sweep runner.
 - [ ] Add context-splitting score.
 - [ ] Add 100k-node performance target.
+- [x] Add v0.2 Scale-Free Failure Decomposition task.
+- [ ] Run v0.2 decomposition receipt from clean commit and attach result to Issue #1.
 
 ## Workstream B: Hard Reasoning Benchmarks
 
