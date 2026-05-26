@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ts-benchmarks"
+version = "0.1.0"
+description = "Benchmark and receipt harness for TS scaling, reasoning, hardware, and hybrid demos."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "BoggersTheFish"}]
+dependencies = []
+
+[project.optional-dependencies]
+plots = ["matplotlib>=3.8"]
+schema = ["jsonschema>=4.0"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+ts-scale-graph = "ts_benchmarks.runners.scale_graph:main"
+ts-scale-sweep = "ts_benchmarks.runners.scale_sweep:main"
+ts-scaling-report = "ts_benchmarks.reports.plot_scaling:main"
+
+[tool.setuptools.packages.find]
+include = ["ts_benchmarks*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
