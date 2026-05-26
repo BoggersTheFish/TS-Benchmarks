@@ -59,6 +59,10 @@ class RelaxationConfig:
     frontier: bool = True
     provenance_weighting: bool = True
     oscillation_window: int = 8
+    update_policy: str = "reference"
+    hub_percentile: float = 0.95
+    hub_damping_factor: float = 0.35
+    nonhub_frontier_fraction: float = 0.30
 
 
 @dataclass
@@ -142,6 +146,8 @@ def run_relaxation(graph: SyntheticGraph, config: RelaxationConfig) -> Relaxatio
     tension_history: list[float] = []
     active_frontier_history: list[int] = []
     peak_node_tension = [0.0 for _ in values]
+    degrees = node_degrees(graph)
+    hub_threshold = degree_percentile(degrees, config.hub_percentile)
     oscillation_detected = False
 
     tracemalloc.start()
@@ -151,7 +157,18 @@ def run_relaxation(graph: SyntheticGraph, config: RelaxationConfig) -> Relaxatio
 
     for _step in range(config.steps):
         active_frontier_history.append(len(active_nodes))
-        active_edges = _active_edges(graph, active_nodes) if config.frontier else range(len(graph.edges))
+        if config.frontier:
+            active_edges = _active_edges(graph, active_nodes)
+            if config.update_policy == "residual_redistribution":
+                active_edges = redistributed_active_edges(
+                    graph=graph,
+                    edge_indexes=active_edges,
+                    degrees=degrees,
+                    hub_threshold=hub_threshold,
+                    nonhub_fraction=config.nonhub_frontier_fraction,
+                )
+        else:
+            active_edges = range(len(graph.edges))
         deltas: dict[int, float] = {}
         relaxed_this_step = 0
 
@@ -173,7 +190,12 @@ def run_relaxation(graph: SyntheticGraph, config: RelaxationConfig) -> Relaxatio
         max_update = 0.0
         next_active: set[int] = set()
         for node, delta in deltas.items():
-            update = config.damping * delta
+            update = config.damping * node_update_multiplier(
+                policy=config.update_policy,
+                degree=degrees[node],
+                hub_threshold=hub_threshold,
+                hub_damping_factor=config.hub_damping_factor,
+            ) * delta
             if update == 0.0:
                 continue
             values[node] = _clamp(values[node] + update)
@@ -380,6 +402,50 @@ def residual_edge_tensions(
             }
         )
     return sorted(rows, key=lambda row: float(row["tension"]), reverse=True)
+
+
+def node_update_multiplier(
+    *,
+    policy: str,
+    degree: int,
+    hub_threshold: int,
+    hub_damping_factor: float,
+) -> float:
+    if policy == "reference" or policy == "residual_redistribution":
+        return 1.0
+    if policy == "degree_normalized":
+        return 1.0 / sqrt(degree + 1.0)
+    if policy == "hub_damping":
+        return hub_damping_factor if degree >= hub_threshold else 1.0
+    raise ValueError(f"unknown update_policy: {policy}")
+
+
+def redistributed_active_edges(
+    *,
+    graph: SyntheticGraph,
+    edge_indexes: list[int],
+    degrees: list[int],
+    hub_threshold: int,
+    nonhub_fraction: float,
+) -> list[int]:
+    if not edge_indexes:
+        return []
+    hub_edges: list[int] = []
+    nonhub_edges: list[int] = []
+    for edge_idx in edge_indexes:
+        edge = graph.edges[edge_idx]
+        touches_hub = degrees[edge.src] >= hub_threshold or degrees[edge.dst] >= hub_threshold
+        if touches_hub:
+            hub_edges.append(edge_idx)
+        else:
+            nonhub_edges.append(edge_idx)
+    if not hub_edges or not nonhub_edges:
+        return edge_indexes
+    target_nonhub = int(len(edge_indexes) * nonhub_fraction)
+    selected_nonhub = nonhub_edges[: max(1, min(len(nonhub_edges), target_nonhub))]
+    remaining = max(0, len(edge_indexes) - len(selected_nonhub))
+    selected_hub = hub_edges[:remaining]
+    return selected_nonhub + selected_hub
 
 
 def edge_tension(edge: Edge, values: list[float], config: RelaxationConfig | None = None) -> float:

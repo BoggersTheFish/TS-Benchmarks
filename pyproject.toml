@@ -22,6 +22,7 @@ ts-scale-graph = "ts_benchmarks.runners.scale_graph:main"
 ts-scale-sweep = "ts_benchmarks.runners.scale_sweep:main"
 ts-scaling-report = "ts_benchmarks.reports.plot_scaling:main"
 ts-scale-free-decomposition = "ts_benchmarks.runners.scale_free_decomposition:main"
+ts-hub-normalization-ablation = "ts_benchmarks.runners.hub_normalization_ablation:main"
 
 [tool.setuptools.packages.find]
 include = ["ts_benchmarks*"]
