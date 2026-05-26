@@ -98,6 +98,8 @@ The branch is experimental. A positive result means the remedy helped seeded syn
 
 The selector uses graph diagnostics only, not outcome metrics.
 
+This is not yet evidence of universal scaling; it is evidence that topology diagnostics can prevent a known policy tradeoff in the current synthetic sweep.
+
 ## Claim Boundary
 
 This repo does not prove TS is a transformer replacement. It measures specific graph/tension behavior under specified configs and emits receipts that can be audited.
