@@ -53,6 +53,16 @@ python3 -m ts_benchmarks.runners.hub_normalization_ablation \
   --out-dir artifacts/hub-normalization
 ```
 
+v0.4 experimental topology-aware selector:
+
+```bash
+python3 -m ts_benchmarks.runners.topology_policy_selection \
+  --sizes 100,1000,10000 \
+  --graphs scale_free,random,small_world \
+  --seed 42 \
+  --out-dir artifacts/topology-policy
+```
+
 Optional plot generation uses dev dependencies only:
 
 ```bash
@@ -78,6 +88,15 @@ Scale-free graphs retain high final tension under the reference relaxation confi
 - residual redistribution
 
 The branch is experimental. A positive result means the remedy helped seeded synthetic graphs, not that TS-Core scales cleanly.
+
+## v0.4 Experimental Branch
+
+`Topology-Aware Relaxation Policy Selection` tests whether pre-run topology diagnostics can select a safer policy:
+
+- hub-heavy graphs select degree normalization
+- non-hub-heavy graphs keep the reference active-frontier policy
+
+The selector uses graph diagnostics only, not outcome metrics.
 
 ## Claim Boundary
 

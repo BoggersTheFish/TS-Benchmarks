@@ -23,6 +23,7 @@ ts-scale-sweep = "ts_benchmarks.runners.scale_sweep:main"
 ts-scaling-report = "ts_benchmarks.reports.plot_scaling:main"
 ts-scale-free-decomposition = "ts_benchmarks.runners.scale_free_decomposition:main"
 ts-hub-normalization-ablation = "ts_benchmarks.runners.hub_normalization_ablation:main"
+ts-topology-policy-selection = "ts_benchmarks.runners.topology_policy_selection:main"
 
 [tool.setuptools.packages.find]
 include = ["ts_benchmarks*"]
