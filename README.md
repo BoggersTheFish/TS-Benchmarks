@@ -1,3 +1,21 @@
+> [!IMPORTANT]
+> **This repository is archived.**
+>
+> The complete implemented TS-Benchmarks Workstream A was consolidated into
+> [`BoggersTheFish/thinking-system`](https://github.com/BoggersTheFish/thinking-system)
+> under:
+>
+> `src/thinking_system/benchmarks/graph_scaling/`
+>
+> Verified source snapshot:
+> `7c0611f7ef4dc2d150b12dc4197a8d48a462207f`
+>
+> Canonical consolidation merge:
+> `4fa7084`
+>
+> Continuing benchmark work and issue tracking now belong in the Thinking
+> System repository. Live obligations were migrated to issues #14 and #15.
+
 # TS-Benchmarks
 
 `TS-Benchmarks` is the audit-first benchmark harness for the Thinking System ecosystem.
